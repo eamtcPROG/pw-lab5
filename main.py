@@ -1,10 +1,10 @@
 import socket
 import ssl
 import sys
-
+from bs4 import BeautifulSoup
 
 def fetch_url(url):
-    """Fetch a URL using a raw socket with SSL for HTTPS."""
+    """Fetch a URL using a raw socket with SSL for HTTPS and parse specific HTML elements in a human-readable way."""
     try:
         scheme, url = parse_scheme(url)
         host, path = parse_url(url)
@@ -16,14 +16,34 @@ def fetch_url(url):
                 request = f"GET {path} HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n\r\n"
                 ssock.send(request.encode())
 
-                response = ""
+                byte_buffer = bytearray()
                 while True:
                     data = ssock.recv(1024)
                     if not data:
                         break
-                    response += data.decode()
+                    byte_buffer += data
 
-                print(strip_headers(response))
+                response = byte_buffer.decode('utf-8', errors='replace')
+                html_content = strip_headers(response)
+                soup = BeautifulSoup(html_content, 'html.parser')
+
+                # Process and print the content in a human-readable way
+                for element in soup.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'a', 'ul', 'li']):
+                    if element.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
+                        print('\n' + element.text)
+                        print('-' * len(element.text))  # Underline for headers
+                    elif element.name == 'p':
+                        print('\n' + element.text)
+                    elif element.name == 'a':
+                        print(f"\nURL: {element.get('href')}")
+                    elif element.name in ['ul', 'li']:
+                        # Indent list items for readability
+                        if element.name == 'li':
+                            print(f"  - {element.text}")
+                        else:
+                            print(element.text)  # For ul, just print the text if needed
+                    # print()  # Extra newline for spacing
+
     except Exception as e:
         print(f"Error: {e}")
 
@@ -56,8 +76,8 @@ def strip_headers(response):
 def show_help():
     """Print the help information."""
     print("""Usage:
-  go2web -u <URL>    # Make an HTTP or HTTPS request to the specified URL and print the response
-  go2web -h          # Show this help""")
+  python3 main.py -u <URL>    # Make an HTTP or HTTPS request to the specified URL and print the response
+  python3 main.py -h          # Show this help""")
 
 
 def main():
